@@ -120,11 +120,62 @@ export async function removeSale(id: string) {
   return { success: true };
 }
 
+export async function updateSale(input: {
+  id: string;
+  soldAt: string;
+  note: string | null;
+  items: { id?: string | null; name: string; unitPrice: number; quantity: number }[];
+}) {
+  const supabase = client();
+  const total = input.items.reduce((sum, i) => sum + i.unitPrice * i.quantity, 0);
+
+  const { data: existing, error: existingError } = await supabase
+    .from("sale_items")
+    .select("id")
+    .eq("sale_id", input.id);
+  if (existingError) throw new Error(existingError.message);
+
+  const keptIds = input.items.map((i) => i.id).filter((id): id is string => Boolean(id));
+  const removed = (existing ?? []).map((i) => i.id).filter((id) => !keptIds.includes(id));
+  if (removed.length > 0) {
+    const { error } = await supabase.from("sale_items").delete().in("id", removed);
+    if (error) throw new Error(error.message);
+  }
+
+  for (const item of input.items) {
+    if (item.id) {
+      const { error } = await supabase
+        .from("sale_items")
+        .update({ name: item.name, unit_price: item.unitPrice, quantity: item.quantity })
+        .eq("id", item.id);
+      if (error) throw new Error(error.message);
+    } else {
+      const { error } = await supabase.from("sale_items").insert({
+        sale_id: input.id,
+        menu_item_id: null,
+        name: item.name,
+        unit_price: item.unitPrice,
+        quantity: item.quantity,
+      });
+      if (error) throw new Error(error.message);
+    }
+  }
+
+  const soldAt = new Date(input.soldAt);
+  const date = `${soldAt.getFullYear()}-${String(soldAt.getMonth() + 1).padStart(2, "0")}-${String(soldAt.getDate()).padStart(2, "0")}`;
+  const { error } = await supabase
+    .from("sales")
+    .update({ sold_at: input.soldAt, note: input.note, total, date })
+    .eq("id", input.id);
+  if (error) throw new Error(error.message);
+  return { success: true, total };
+}
+
 export async function getSalesByDate(date: string): Promise<Sale[]> {
   const supabase = client();
   const { data: sales, error } = await supabase
     .from("sales")
-    .select("id, date, sold_at, total, note")
+    .select("id, date, sold_at, total, note, original_sold_at, original_total, original_note")
     .eq("date", date)
     .order("sold_at", { ascending: true });
   if (error) throw new Error(error.message);
@@ -133,7 +184,9 @@ export async function getSalesByDate(date: string): Promise<Sale[]> {
 
   const { data: items, error: itemError } = await supabase
     .from("sale_items")
-    .select("id, sale_id, name, unit_price, quantity")
+    .select(
+      "id, sale_id, name, unit_price, quantity, original_name, original_unit_price, original_quantity, created_at",
+    )
     .in("sale_id", ids);
   if (itemError) throw new Error(itemError.message);
 
@@ -141,7 +194,16 @@ export async function getSalesByDate(date: string): Promise<Sale[]> {
     ...s,
     items: (items ?? [])
       .filter((i) => i.sale_id === s.id)
-      .map((i) => ({ id: i.id, name: i.name, unit_price: i.unit_price, quantity: i.quantity })),
+      .sort((a, b) => a.created_at.localeCompare(b.created_at))
+      .map((i) => ({
+        id: i.id,
+        name: i.name,
+        unit_price: i.unit_price,
+        quantity: i.quantity,
+        original_name: i.original_name,
+        original_unit_price: i.original_unit_price,
+        original_quantity: i.original_quantity,
+      })),
   }));
 }
 

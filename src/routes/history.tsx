@@ -2,13 +2,24 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
-import { ChevronLeft, ChevronRight, Trash2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Toaster } from "@/components/ui/sonner";
 import { AppNav } from "@/components/shop/AppNav";
+import { SaleEditDialog } from "@/components/shop/SaleEditDialog";
 import { deleteSale, listSales, monthTotals } from "@/lib/shop.functions";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -46,6 +57,8 @@ function HistoryPage() {
     `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`,
   );
   const [openSale, setOpenSale] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const queryClient = useQueryClient();
   const deleteSaleFn = useServerFn(deleteSale);
 
@@ -76,15 +89,21 @@ function HistoryPage() {
     setMonth(d.getMonth());
   }
 
+  function refreshAll() {
+    queryClient.invalidateQueries({ queryKey: ["sales"] });
+    queryClient.invalidateQueries({ queryKey: ["monthTotals"] });
+    queryClient.invalidateQueries({ queryKey: ["analytics"] });
+  }
+
   async function handleDeleteSale(id: string) {
     try {
       await deleteSaleFn({ data: { id } });
       toast.success("会計を削除しました");
-      queryClient.invalidateQueries({ queryKey: ["sales", selected] });
-      queryClient.invalidateQueries({ queryKey: ["monthTotals"] });
-      queryClient.invalidateQueries({ queryKey: ["analytics"] });
+      refreshAll();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "削除に失敗しました");
+    } finally {
+      setDeletingId(null);
     }
   }
 
@@ -172,7 +191,7 @@ function HistoryPage() {
                           onClick={() => setOpenSale(openSale === sale.id ? null : sale.id)}
                         >
                           <span>
-                            客{index + 1}
+                            会計{index + 1}
                             <span className="ml-2 text-xs text-muted-foreground">
                               {new Date(sale.sold_at).toLocaleTimeString("ja-JP", {
                                 hour: "2-digit",
@@ -187,7 +206,15 @@ function HistoryPage() {
                         <Button
                           variant="ghost"
                           size="icon"
-                          onClick={() => handleDeleteSale(sale.id)}
+                          onClick={() => setEditingId(sale.id)}
+                          aria-label="この会計を編集"
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => setDeletingId(sale.id)}
                           aria-label="この会計を削除"
                         >
                           <Trash2 className="h-4 w-4 text-destructive" />
@@ -207,6 +234,15 @@ function HistoryPage() {
                           ))}
                         </ul>
                       )}
+                      {editingId === sale.id && (
+                        <SaleEditDialog
+                          sale={sale}
+                          label={`会計${index + 1}`}
+                          open
+                          onOpenChange={(open) => !open && setEditingId(null)}
+                          onSaved={refreshAll}
+                        />
+                      )}
                     </li>
                   ))}
                 </ul>
@@ -214,6 +250,23 @@ function HistoryPage() {
             </CardContent>
           </Card>
         )}
+
+        <AlertDialog open={Boolean(deletingId)} onOpenChange={(open) => !open && setDeletingId(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>この会計を削除しますか？</AlertDialogTitle>
+              <AlertDialogDescription>
+                削除すると明細も含めて元に戻せません。売上集計からも除外されます。
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>キャンセル</AlertDialogCancel>
+              <AlertDialogAction onClick={() => deletingId && handleDeleteSale(deletingId)}>
+                削除する
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </main>
     </div>
   );

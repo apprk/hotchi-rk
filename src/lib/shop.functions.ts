@@ -60,12 +60,7 @@ export const registerSale = createServerFn({ method: "POST" })
       date: data.date,
       soldAt: data.soldAt,
       note: data.note ?? null,
-      items: data.items.map((i) => ({
-        id: i.id ?? null,
-        name: i.name,
-        unitPrice: i.unitPrice,
-        quantity: i.quantity,
-      })),
+      items: data.items,
     });
   });
 
@@ -84,7 +79,12 @@ export const updateSaleRecord = createServerFn({ method: "POST" })
       id: data.id,
       soldAt: data.soldAt,
       note: data.note ?? null,
-      items: data.items,
+      items: data.items.map((i) => ({
+        id: i.id ?? null,
+        name: i.name,
+        unitPrice: i.unitPrice,
+        quantity: i.quantity,
+      })),
     });
   });
 

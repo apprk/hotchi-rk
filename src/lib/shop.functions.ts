@@ -8,6 +8,8 @@ import {
   monthSchema,
   copySchema,
   saleInputSchema,
+  saleUpdateSchema,
+  analyticsSchema,
 } from "@/lib/shop.schemas";
 
 export const listMenus = createServerFn({ method: "GET" })
@@ -69,6 +71,18 @@ export const deleteSale = createServerFn({ method: "POST" })
     return removeSale(data.id);
   });
 
+export const updateSaleRecord = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) => saleUpdateSchema.parse(input))
+  .handler(async ({ data }) => {
+    const { updateSale } = await import("@/lib/shop.server");
+    return updateSale({
+      id: data.id,
+      soldAt: data.soldAt,
+      note: data.note ?? null,
+      items: data.items,
+    });
+  });
+
 export const listSales = createServerFn({ method: "GET" })
   .inputValidator((input: unknown) => dateSchema.parse(input))
   .handler(async ({ data }) => {
@@ -83,9 +97,11 @@ export const monthTotals = createServerFn({ method: "GET" })
     return getMonthTotals(data.month);
   });
 
-export const analytics = createServerFn({ method: "GET" }).handler(async () => {
-  const { getAnalytics } = await import("@/lib/shop.server");
-  return getAnalytics();
-});
+export const analytics = createServerFn({ method: "GET" })
+  .inputValidator((input: unknown) => analyticsSchema.parse(input ?? {}))
+  .handler(async ({ data }) => {
+    const { getAnalytics } = await import("@/lib/shop.server");
+    return getAnalytics(data.year ?? null);
+  });
 
 export type SaleInput = z.infer<typeof saleInputSchema>;

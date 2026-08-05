@@ -232,20 +232,30 @@ export async function getMonthTotals(month: string): Promise<DayTotal[]> {
 
 const WEEKDAYS = ["日", "月", "火", "水", "木", "金", "土"];
 
-export async function getAnalytics(): Promise<Analytics> {
+export async function getAnalytics(year: number | null): Promise<Analytics> {
   const supabase = client();
   const { data: sales, error } = await supabase.from("sales").select("id, date, sold_at, total");
   if (error) throw new Error(error.message);
   const { data: items, error: itemError } = await supabase
     .from("sale_items")
-    .select("name, unit_price, quantity");
+    .select("sale_id, name, unit_price, quantity");
   if (itemError) throw new Error(itemError.message);
+
+  const years = Array.from(new Set((sales ?? []).map((s) => Number(s.date.slice(0, 4)))))
+    .filter((y) => Number.isFinite(y))
+    .sort((a, b) => b - a);
+
+  const filteredSales = (sales ?? []).filter(
+    (s) => year === null || Number(s.date.slice(0, 4)) === year,
+  );
+  const saleIds = new Set(filteredSales.map((s) => s.id));
+  const filteredItems = (items ?? []).filter((i) => saleIds.has(i.sale_id));
 
   const monthly = new Map<string, NamedTotal>();
   const weekday = new Map<string, NamedTotal>();
   const hourly = new Map<string, NamedTotal>();
 
-  for (const s of sales ?? []) {
+  for (const s of filteredSales) {
     const month = s.date.slice(0, 7);
     const m = monthly.get(month) ?? { key: month, total: 0, count: 0 };
     m.total += s.total;
@@ -259,7 +269,7 @@ export async function getAnalytics(): Promise<Analytics> {
     w.count += 1;
     weekday.set(wKey, w);
 
-    const hKey = `${String(d.getHours()).padStart(2, "0")}時`;
+    const hKey = `${String(d.getHours()).padStart(2, "0")}:${d.getMinutes() < 30 ? "00" : "30"}`;
     const h = hourly.get(hKey) ?? { key: hKey, total: 0, count: 0 };
     h.total += s.total;
     h.count += 1;
@@ -267,7 +277,7 @@ export async function getAnalytics(): Promise<Analytics> {
   }
 
   const menus = new Map<string, NamedTotal>();
-  for (const i of items ?? []) {
+  for (const i of filteredItems) {
     const entry = menus.get(i.name) ?? { key: i.name, total: 0, count: 0 };
     entry.total += i.unit_price * i.quantity;
     entry.count += i.quantity;
@@ -275,6 +285,7 @@ export async function getAnalytics(): Promise<Analytics> {
   }
 
   return {
+    years,
     monthly: Array.from(monthly.values()).sort((a, b) => a.key.localeCompare(b.key)),
     weekday: WEEKDAYS.map((w) => weekday.get(w) ?? { key: w, total: 0, count: 0 }),
     hourly: Array.from(hourly.values()).sort((a, b) => a.key.localeCompare(b.key)),

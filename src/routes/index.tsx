@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useMemo, useState } from "react";
-import { Minus, Plus, Trash2 } from "lucide-react";
+import { Minus, MonitorSmartphone, Plus, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -45,6 +45,7 @@ function RegisterPage() {
   const queryClient = useQueryClient();
   const registerSaleFn = useServerFn(registerSale);
   const [isSaving, setIsSaving] = useState(false);
+  const [customerView, setCustomerView] = useState(false);
 
   const menusQuery = useQuery({
     queryKey: ["menus", date],
@@ -108,6 +109,45 @@ function RegisterPage() {
   const daySales = salesQuery.data ?? [];
   const dayTotal = daySales.reduce((sum, s) => sum + s.total, 0);
 
+  if (customerView) {
+    return (
+      <div className="flex min-h-screen flex-col bg-background">
+        <div className="flex items-center justify-between border-b px-6 py-4">
+          <h2 className="text-xl font-semibold tracking-tight">お会計</h2>
+          <Button variant="outline" size="sm" onClick={() => setCustomerView(false)}>
+            <X className="mr-1 h-4 w-4" />
+            スタッフ画面へ
+          </Button>
+        </div>
+        <div className="flex flex-1 flex-col justify-between px-6 py-6">
+          {lines.length === 0 ? (
+            <p className="text-center text-2xl text-muted-foreground">商品を選んでいます...</p>
+          ) : (
+            <ul className="space-y-4">
+              {lines.map((l) => (
+                <li key={l.menu.id} className="flex items-baseline justify-between border-b pb-3">
+                  <span className="text-2xl font-medium sm:text-3xl">{l.menu.name}</span>
+                  <span className="ml-4 text-lg tabular-nums text-muted-foreground sm:text-xl">
+                    ¥{l.menu.price.toLocaleString()} × {l.quantity}
+                  </span>
+                  <span className="ml-4 w-32 text-right text-2xl font-semibold tabular-nums sm:text-3xl">
+                    ¥{(l.menu.price * l.quantity).toLocaleString()}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+          <div className="mt-8 rounded-lg bg-primary/10 px-6 py-6 text-right">
+            <div className="text-lg text-muted-foreground">合計 {itemCount} 点</div>
+            <div className="text-5xl font-bold tabular-nums text-primary sm:text-6xl">
+              ¥{total.toLocaleString()}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-background pb-32">
       <Toaster position="top-center" />
@@ -120,7 +160,12 @@ function RegisterPage() {
               本日 {daySales.length} 組 / 売上 ¥{dayTotal.toLocaleString()}
             </p>
           </div>
-          <div className="space-y-1">
+          <div className="flex items-end gap-3">
+            <Button variant="outline" onClick={() => setCustomerView(true)}>
+              <MonitorSmartphone className="mr-1 h-4 w-4" />
+              客用画面
+            </Button>
+            <div className="space-y-1">
             <Label htmlFor="date" className="text-xs">
               営業日
             </Label>
@@ -134,6 +179,7 @@ function RegisterPage() {
               }}
               className="w-44"
             />
+            </div>
           </div>
         </header>
 
@@ -203,7 +249,7 @@ function RegisterPage() {
               {daySales.map((sale, index) => (
                 <div key={sale.id} className="flex justify-between border-b pb-2 text-sm last:border-0">
                   <span>
-                    客{index + 1}・
+                    会計{index + 1}・
                     {new Date(sale.sold_at).toLocaleTimeString("ja-JP", {
                       hour: "2-digit",
                       minute: "2-digit",

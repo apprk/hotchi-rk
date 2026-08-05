@@ -50,6 +50,9 @@ export type Database = {
           id: string
           menu_item_id: string | null
           name: string
+          original_name: string | null
+          original_quantity: number | null
+          original_unit_price: number | null
           quantity: number
           sale_id: string
           unit_price: number
@@ -59,6 +62,9 @@ export type Database = {
           id?: string
           menu_item_id?: string | null
           name: string
+          original_name?: string | null
+          original_quantity?: number | null
+          original_unit_price?: number | null
           quantity?: number
           sale_id: string
           unit_price: number
@@ -68,6 +74,9 @@ export type Database = {
           id?: string
           menu_item_id?: string | null
           name?: string
+          original_name?: string | null
+          original_quantity?: number | null
+          original_unit_price?: number | null
           quantity?: number
           sale_id?: string
           unit_price?: number
@@ -95,6 +104,9 @@ export type Database = {
           date: string
           id: string
           note: string | null
+          original_note: string | null
+          original_sold_at: string | null
+          original_total: number | null
           sold_at: string
           total: number
           updated_at: string
@@ -104,6 +116,9 @@ export type Database = {
           date?: string
           id?: string
           note?: string | null
+          original_note?: string | null
+          original_sold_at?: string | null
+          original_total?: number | null
           sold_at?: string
           total?: number
           updated_at?: string
@@ -113,6 +128,9 @@ export type Database = {
           date?: string
           id?: string
           note?: string | null
+          original_note?: string | null
+          original_sold_at?: string | null
+          original_total?: number | null
           sold_at?: string
           total?: number
           updated_at?: string

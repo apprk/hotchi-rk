@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 import {
   Bar,
   BarChart,
@@ -13,6 +14,7 @@ import {
 } from "recharts";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { AppNav } from "@/components/shop/AppNav";
 import { analytics } from "@/lib/shop.functions";
 import type { NamedTotal } from "@/lib/shop.types";
@@ -93,23 +95,43 @@ function ChartCard({
 }
 
 function AnalyticsPage() {
+  const [year, setYear] = useState<number | null>(new Date().getFullYear());
   const { data, isLoading } = useQuery({
-    queryKey: ["analytics"],
-    queryFn: () => analytics(),
+    queryKey: ["analytics", year],
+    queryFn: () => analytics({ data: { year } }),
   });
+
+  const years = data?.years ?? [];
+  const options: { label: string; value: number | null }[] = [
+    ...years.map((y) => ({ label: `${y}年`, value: y as number | null })),
+    { label: "全期間", value: null },
+  ];
 
   return (
     <div className="min-h-screen bg-background">
       <AppNav />
       <main className="mx-auto max-w-4xl space-y-6 px-4 py-6">
         <h1 className="text-2xl font-bold tracking-tight">売上分析</h1>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-sm text-muted-foreground">分析年</span>
+          {options.map((o) => (
+            <Button
+              key={o.label}
+              size="sm"
+              variant={year === o.value ? "default" : "outline"}
+              onClick={() => setYear(o.value)}
+            >
+              {o.label}
+            </Button>
+          ))}
+        </div>
         {isLoading || !data ? (
           <p className="text-muted-foreground">読み込み中...</p>
         ) : (
           <>
             <ChartCard title="月別の売上推移" data={data.monthly} type="line" />
             <ChartCard title="曜日別の売上" data={data.weekday} type="bar" />
-            <ChartCard title="時間帯別の売上" data={data.hourly} type="bar" />
+            <ChartCard title="時間帯別の売上（30分単位）" data={data.hourly} type="bar" />
             <Card>
               <CardHeader>
                 <CardTitle className="text-base">メニュー別 売上ランキング</CardTitle>

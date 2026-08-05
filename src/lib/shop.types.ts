@@ -11,6 +11,9 @@ export interface SaleItem {
   name: string;
   unit_price: number;
   quantity: number;
+  original_name: string | null;
+  original_unit_price: number | null;
+  original_quantity: number | null;
 }
 
 export interface Sale {
@@ -19,6 +22,9 @@ export interface Sale {
   sold_at: string;
   total: number;
   note: string | null;
+  original_sold_at: string | null;
+  original_total: number | null;
+  original_note: string | null;
   items: SaleItem[];
 }
 
@@ -35,6 +41,7 @@ export interface NamedTotal {
 }
 
 export interface Analytics {
+  years: number[];
   monthly: NamedTotal[];
   weekday: NamedTotal[];
   hourly: NamedTotal[];

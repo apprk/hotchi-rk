@@ -120,11 +120,62 @@ export async function removeSale(id: string) {
   return { success: true };
 }
 
+export async function updateSale(input: {
+  id: string;
+  soldAt: string;
+  note: string | null;
+  items: { id?: string | null; name: string; unitPrice: number; quantity: number }[];
+}) {
+  const supabase = client();
+  const total = input.items.reduce((sum, i) => sum + i.unitPrice * i.quantity, 0);
+
+  const { data: existing, error: existingError } = await supabase
+    .from("sale_items")
+    .select("id")
+    .eq("sale_id", input.id);
+  if (existingError) throw new Error(existingError.message);
+
+  const keptIds = input.items.map((i) => i.id).filter((id): id is string => Boolean(id));
+  const removed = (existing ?? []).map((i) => i.id).filter((id) => !keptIds.includes(id));
+  if (removed.length > 0) {
+    const { error } = await supabase.from("sale_items").delete().in("id", removed);
+    if (error) throw new Error(error.message);
+  }
+
+  for (const item of input.items) {
+    if (item.id) {
+      const { error } = await supabase
+        .from("sale_items")
+        .update({ name: item.name, unit_price: item.unitPrice, quantity: item.quantity })
+        .eq("id", item.id);
+      if (error) throw new Error(error.message);
+    } else {
+      const { error } = await supabase.from("sale_items").insert({
+        sale_id: input.id,
+        menu_item_id: null,
+        name: item.name,
+        unit_price: item.unitPrice,
+        quantity: item.quantity,
+      });
+      if (error) throw new Error(error.message);
+    }
+  }
+
+  const soldAt = new Date(input.soldAt);
+  const date = `${soldAt.getFullYear()}-${String(soldAt.getMonth() + 1).padStart(2, "0")}-${String(soldAt.getDate()).padStart(2, "0")}`;
+  const { error } = await supabase
+    .from("sales")
+    .update({ sold_at: input.soldAt, note: input.note, total, date })
+    .eq("id", input.id);
+  if (error) throw new Error(error.message);
+  return { success: true, total };
+}
+
 export async function getSalesByDate(date: string): Promise<Sale[]> {
   const supabase = client();
   const { data: sales, error } = await supabase
     .from("sales")
-    .select("id, date, sold_at, total, note")
+    .select("id, date, sold_at, total, note, original_sold_at, original_total, original_note")
     .eq("date", date)
     .order("sold_at", { ascending: true });
   if (error) throw new Error(error.message);
@@ -133,7 +184,9 @@ export async function getSalesByDate(date: string): Promise<Sale[]> {
 
   const { data: items, error: itemError } = await supabase
     .from("sale_items")
-    .select("id, sale_id, name, unit_price, quantity")
+    .select(
+      "id, sale_id, name, unit_price, quantity, original_name, original_unit_price, original_quantity, created_at",
+    )
     .in("sale_id", ids);
   if (itemError) throw new Error(itemError.message);
 
@@ -141,7 +194,16 @@ export async function getSalesByDate(date: string): Promise<Sale[]> {
     ...s,
     items: (items ?? [])
       .filter((i) => i.sale_id === s.id)
-      .map((i) => ({ id: i.id, name: i.name, unit_price: i.unit_price, quantity: i.quantity })),
+      .sort((a, b) => a.created_at.localeCompare(b.created_at))
+      .map((i) => ({
+        id: i.id,
+        name: i.name,
+        unit_price: i.unit_price,
+        quantity: i.quantity,
+        original_name: i.original_name,
+        original_unit_price: i.original_unit_price,
+        original_quantity: i.original_quantity,
+      })),
   }));
 }
 
@@ -170,20 +232,30 @@ export async function getMonthTotals(month: string): Promise<DayTotal[]> {
 
 const WEEKDAYS = ["日", "月", "火", "水", "木", "金", "土"];
 
-export async function getAnalytics(): Promise<Analytics> {
+export async function getAnalytics(year: number | null): Promise<Analytics> {
   const supabase = client();
   const { data: sales, error } = await supabase.from("sales").select("id, date, sold_at, total");
   if (error) throw new Error(error.message);
   const { data: items, error: itemError } = await supabase
     .from("sale_items")
-    .select("name, unit_price, quantity");
+    .select("sale_id, name, unit_price, quantity");
   if (itemError) throw new Error(itemError.message);
+
+  const years = Array.from(new Set((sales ?? []).map((s) => Number(s.date.slice(0, 4)))))
+    .filter((y) => Number.isFinite(y))
+    .sort((a, b) => b - a);
+
+  const filteredSales = (sales ?? []).filter(
+    (s) => year === null || Number(s.date.slice(0, 4)) === year,
+  );
+  const saleIds = new Set(filteredSales.map((s) => s.id));
+  const filteredItems = (items ?? []).filter((i) => saleIds.has(i.sale_id));
 
   const monthly = new Map<string, NamedTotal>();
   const weekday = new Map<string, NamedTotal>();
   const hourly = new Map<string, NamedTotal>();
 
-  for (const s of sales ?? []) {
+  for (const s of filteredSales) {
     const month = s.date.slice(0, 7);
     const m = monthly.get(month) ?? { key: month, total: 0, count: 0 };
     m.total += s.total;
@@ -197,7 +269,7 @@ export async function getAnalytics(): Promise<Analytics> {
     w.count += 1;
     weekday.set(wKey, w);
 
-    const hKey = `${String(d.getHours()).padStart(2, "0")}時`;
+    const hKey = `${String(d.getHours()).padStart(2, "0")}:${d.getMinutes() < 30 ? "00" : "30"}`;
     const h = hourly.get(hKey) ?? { key: hKey, total: 0, count: 0 };
     h.total += s.total;
     h.count += 1;
@@ -205,7 +277,7 @@ export async function getAnalytics(): Promise<Analytics> {
   }
 
   const menus = new Map<string, NamedTotal>();
-  for (const i of items ?? []) {
+  for (const i of filteredItems) {
     const entry = menus.get(i.name) ?? { key: i.name, total: 0, count: 0 };
     entry.total += i.unit_price * i.quantity;
     entry.count += i.quantity;
@@ -213,6 +285,7 @@ export async function getAnalytics(): Promise<Analytics> {
   }
 
   return {
+    years,
     monthly: Array.from(monthly.values()).sort((a, b) => a.key.localeCompare(b.key)),
     weekday: WEEKDAYS.map((w) => weekday.get(w) ?? { key: w, total: 0, count: 0 }),
     hourly: Array.from(hourly.values()).sort((a, b) => a.key.localeCompare(b.key)),

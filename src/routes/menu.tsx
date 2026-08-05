@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
-import { Trash2 } from "lucide-react";
+import { Check, Copy, Pencil, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -17,6 +17,7 @@ import {
   deleteMenuItem,
   listMenus,
   listPastMenus,
+  updateMenuItem,
 } from "@/lib/shop.functions";
 
 function todayString() {
@@ -50,11 +51,15 @@ function MenuPage() {
   const [price, setPrice] = useState("");
   const [copyFrom, setCopyFrom] = useState("");
   const [busy, setBusy] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editPrice, setEditPrice] = useState("");
   const queryClient = useQueryClient();
 
   const addFn = useServerFn(addMenuItem);
   const deleteFn = useServerFn(deleteMenuItem);
   const copyFn = useServerFn(copyMenuFromDate);
+  const updateFn = useServerFn(updateMenuItem);
 
   const menusQuery = useQuery({
     queryKey: ["menus", date],
@@ -93,6 +98,34 @@ function MenuPage() {
       refresh();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "削除に失敗しました");
+    }
+  }
+
+  async function handleSaveEdit(id: string) {
+    const priceNumber = Number(editPrice);
+    if (!editName.trim() || !Number.isInteger(priceNumber) || priceNumber < 0) {
+      toast.error("メニュー名と正しい金額を入力してください");
+      return;
+    }
+    try {
+      await updateFn({ data: { id, name: editName.trim(), price: priceNumber } });
+      setEditingId(null);
+      refresh();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "更新に失敗しました");
+    }
+  }
+
+  async function handleDuplicate(menu: { name: string; price: number }) {
+    try {
+      const created = await addFn({ data: { date, name: menu.name, price: menu.price } });
+      refresh();
+      setEditingId(created.id);
+      setEditName(created.name);
+      setEditPrice(String(created.price));
+      toast.success("コピーしました。内容を編集できます");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "コピーに失敗しました");
     }
   }
 
@@ -220,19 +253,73 @@ function MenuPage() {
             ) : (
               <ul className="divide-y">
                 {menus.map((menu) => (
-                  <li key={menu.id} className="flex items-center justify-between py-2">
-                    <span>{menu.name}</span>
-                    <div className="flex items-center gap-3">
-                      <span className="tabular-nums">¥{menu.price.toLocaleString()}</span>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleDelete(menu.id)}
-                        aria-label={`${menu.name}を削除`}
-                      >
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
-                    </div>
+                  <li key={menu.id} className="py-2">
+                    {editingId === menu.id ? (
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Input
+                          value={editName}
+                          onChange={(e) => setEditName(e.target.value)}
+                          className="min-w-32 flex-1"
+                          maxLength={60}
+                          aria-label="メニュー名"
+                        />
+                        <Input
+                          type="number"
+                          min={0}
+                          step={10}
+                          value={editPrice}
+                          onChange={(e) => setEditPrice(e.target.value)}
+                          className="w-28"
+                          aria-label="値段"
+                        />
+                        <Button size="icon" onClick={() => handleSaveEdit(menu.id)} aria-label="保存">
+                          <Check className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => setEditingId(null)}
+                          aria-label="キャンセル"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-between">
+                        <span>{menu.name}</span>
+                        <div className="flex items-center gap-1">
+                          <span className="mr-2 tabular-nums">¥{menu.price.toLocaleString()}</span>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => {
+                              setEditingId(menu.id);
+                              setEditName(menu.name);
+                              setEditPrice(String(menu.price));
+                            }}
+                            aria-label={`${menu.name}を編集`}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleDuplicate(menu)}
+                            aria-label={`${menu.name}をコピー`}
+                          >
+                            <Copy className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleDelete(menu.id)}
+                            aria-label={`${menu.name}を削除`}
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </div>
+                      </div>
+                    )}
                   </li>
                 ))}
               </ul>

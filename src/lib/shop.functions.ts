@@ -60,7 +60,12 @@ export const registerSale = createServerFn({ method: "POST" })
       date: data.date,
       soldAt: data.soldAt,
       note: data.note ?? null,
-      items: data.items,
+      items: data.items.map((i) => ({
+        id: i.id ?? null,
+        name: i.name,
+        unitPrice: i.unitPrice,
+        quantity: i.quantity,
+      })),
     });
   });
 

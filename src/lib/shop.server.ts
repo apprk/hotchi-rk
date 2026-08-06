@@ -69,6 +69,18 @@ export async function copyMenus(input: { from: string; to: string }) {
   return { copied: source.length };
 }
 
+export async function reorderMenus(ids: string[]) {
+  const supabase = client();
+  for (let i = 0; i < ids.length; i += 1) {
+    const { error } = await supabase
+      .from("menu_items")
+      .update({ sort_order: i })
+      .eq("id", ids[i] as string);
+    if (error) throw new Error(error.message);
+  }
+  return { success: true };
+}
+
 export async function getPastMenuNames(): Promise<{ name: string; price: number }[]> {
   const { data, error } = await client()
     .from("menu_items")
@@ -87,13 +99,25 @@ export async function createSale(input: {
   date: string;
   soldAt: string;
   note: string | null;
+  discount?: { type: "yen" | "percent" | null; value: number } | null;
   items: { menuItemId: string | null; name: string; unitPrice: number; quantity: number }[];
 }) {
   const supabase = client();
-  const total = input.items.reduce((sum, i) => sum + i.unitPrice * i.quantity, 0);
+  const subtotal = input.items.reduce((sum, i) => sum + i.unitPrice * i.quantity, 0);
+  const discountAmount = computeDiscount(subtotal, input.discount ?? null);
+  const total = Math.max(0, subtotal - discountAmount);
   const { data: sale, error } = await supabase
     .from("sales")
-    .insert({ date: input.date, sold_at: input.soldAt, total, note: input.note })
+    .insert({
+      date: input.date,
+      sold_at: input.soldAt,
+      total,
+      note: input.note,
+      subtotal,
+      discount_type: input.discount?.type ?? null,
+      discount_value: input.discount?.type ? Math.round(input.discount.value) : null,
+      discount_amount: discountAmount,
+    })
     .select("id")
     .single();
   if (error) throw new Error(error.message);
@@ -112,6 +136,18 @@ export async function createSale(input: {
     throw new Error(itemError.message);
   }
   return { id: sale.id, total };
+}
+
+export function computeDiscount(
+  subtotal: number,
+  discount: { type: "yen" | "percent" | null; value: number } | null,
+): number {
+  if (!discount || !discount.type || !discount.value) return 0;
+  const amount =
+    discount.type === "yen"
+      ? Math.round(discount.value)
+      : Math.round((subtotal * discount.value) / 100);
+  return Math.min(Math.max(0, amount), subtotal);
 }
 
 export async function removeSale(id: string) {

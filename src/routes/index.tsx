@@ -147,7 +147,7 @@ function RegisterPage() {
 
   const daySales = salesQuery.data ?? [];
   const receivedNumber = Number(received);
-  const change = Number.isFinite(receivedNumber) ? receivedNumber - total : 0;
+  const changeAmount = Number.isFinite(receivedNumber) ? receivedNumber - total : 0;
 
   if (customerView) {
     return (
@@ -420,9 +420,9 @@ function RegisterPage() {
             <div className="rounded-lg bg-primary/10 px-4 py-4 text-right">
               <div className="text-xs text-muted-foreground">お釣り</div>
               <div className="text-3xl font-bold tabular-nums text-primary">
-                {received === "" || change < 0 ? "—" : yen(change)}
+                {received === "" || changeAmount < 0 ? "—" : yen(changeAmount)}
               </div>
-              {change < 0 && received !== "" && (
+              {changeAmount < 0 && received !== "" && (
                 <p className="text-xs text-destructive">預かり金額が不足しています</p>
               )}
             </div>

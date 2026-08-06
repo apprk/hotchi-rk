@@ -292,6 +292,17 @@ export async function getMonthTotals(month: string): Promise<DayTotal[]> {
 
 const WEEKDAYS = ["日", "月", "火", "水", "木", "金", "土"];
 
+/** タイムスタンプを日本時間の年月日・曜日・時分に分解する */
+function jst(iso: string) {
+  const d = new Date(iso);
+  const shifted = new Date(d.getTime() + 9 * 60 * 60 * 1000);
+  return {
+    day: shifted.getUTCDay(),
+    hours: shifted.getUTCHours(),
+    minutes: shifted.getUTCMinutes(),
+  };
+}
+
 export async function getAnalytics(year: number | null): Promise<Analytics> {
   const supabase = client();
   const { data: sales, error } = await supabase.from("sales").select("id, date, sold_at, total");
@@ -314,6 +325,7 @@ export async function getAnalytics(year: number | null): Promise<Analytics> {
   const monthly = new Map<string, NamedTotal>();
   const weekday = new Map<string, NamedTotal>();
   const hourly = new Map<string, NamedTotal>();
+  const yearly = new Map<string, NamedTotal>();
 
   for (const s of filteredSales) {
     const month = s.date.slice(0, 7);
@@ -322,14 +334,20 @@ export async function getAnalytics(year: number | null): Promise<Analytics> {
     m.count += 1;
     monthly.set(month, m);
 
-    const d = new Date(s.sold_at);
-    const wKey = WEEKDAYS[d.getDay()] ?? "?";
+    const yKey = s.date.slice(0, 4);
+    const y = yearly.get(yKey) ?? { key: yKey, total: 0, count: 0 };
+    y.total += s.total;
+    y.count += 1;
+    yearly.set(yKey, y);
+
+    const d = jst(s.sold_at);
+    const wKey = WEEKDAYS[d.day] ?? "?";
     const w = weekday.get(wKey) ?? { key: wKey, total: 0, count: 0 };
     w.total += s.total;
     w.count += 1;
     weekday.set(wKey, w);
 
-    const hKey = `${String(d.getHours()).padStart(2, "0")}:${d.getMinutes() < 30 ? "00" : "30"}`;
+    const hKey = `${String(d.hours).padStart(2, "0")}:${d.minutes < 30 ? "00" : "30"}`;
     const h = hourly.get(hKey) ?? { key: hKey, total: 0, count: 0 };
     h.total += s.total;
     h.count += 1;
@@ -346,6 +364,7 @@ export async function getAnalytics(year: number | null): Promise<Analytics> {
 
   return {
     years,
+    yearly: Array.from(yearly.values()).sort((a, b) => a.key.localeCompare(b.key)),
     monthly: Array.from(monthly.values()).sort((a, b) => a.key.localeCompare(b.key)),
     weekday: WEEKDAYS.map((w) => weekday.get(w) ?? { key: w, total: 0, count: 0 }),
     hourly: Array.from(hourly.values()).sort((a, b) => a.key.localeCompare(b.key)),

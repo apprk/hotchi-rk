@@ -15,8 +15,10 @@ import {
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AppNav } from "@/components/shop/AppNav";
 import { analytics } from "@/lib/shop.functions";
+import { taxBreakdown, useSettings, yen } from "@/lib/settings";
 import type { NamedTotal } from "@/lib/shop.types";
 
 export const Route = createFileRoute("/analytics")({
@@ -39,51 +41,73 @@ export const Route = createFileRoute("/analytics")({
   component: AnalyticsPage,
 });
 
-function yen(value: number) {
-  return `¥${value.toLocaleString()}`;
+type Metric = "sales" | "visits" | "average";
+
+const METRICS: { value: Metric; label: string; unit: string }[] = [
+  { value: "sales", label: "売上分析", unit: "円" },
+  { value: "visits", label: "来店分析", unit: "組" },
+  { value: "average", label: "客単価分析", unit: "円" },
+];
+
+function metricValue(entry: NamedTotal, metric: Metric) {
+  if (metric === "visits") return entry.count;
+  if (metric === "average") return entry.count === 0 ? 0 : Math.round(entry.total / entry.count);
+  return entry.total;
+}
+
+function formatMetric(value: number, metric: Metric) {
+  return metric === "visits" ? `${value.toLocaleString()}組` : yen(value);
 }
 
 function ChartCard({
   title,
   data,
   type,
+  metric,
 }: {
   title: string;
   data: NamedTotal[];
   type: "line" | "bar";
+  metric: Metric;
 }) {
+  const chartData = data.map((d) => ({ key: d.key, value: metricValue(d, metric) }));
   return (
     <Card>
       <CardHeader>
         <CardTitle className="text-base">{title}</CardTitle>
       </CardHeader>
       <CardContent>
-        {data.length === 0 ? (
+        {chartData.length === 0 ? (
           <p className="text-sm text-muted-foreground">データがまだありません。</p>
         ) : (
           <div className="h-64 w-full">
             <ResponsiveContainer width="100%" height="100%">
               {type === "line" ? (
-                <LineChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                <LineChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="key" tick={{ fontSize: 12 }} />
                   <YAxis tick={{ fontSize: 12 }} />
-                  <Tooltip formatter={(v: number) => yen(v)} />
+                  <Tooltip formatter={(v: number) => formatMetric(v, metric)} />
                   <Line
                     type="monotone"
-                    dataKey="total"
-                    name="売上"
+                    dataKey="value"
+                    name={METRICS.find((m) => m.value === metric)?.label ?? ""}
                     stroke="var(--color-primary)"
                     strokeWidth={2}
                   />
                 </LineChart>
               ) : (
-                <BarChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                <BarChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="key" tick={{ fontSize: 12 }} />
                   <YAxis tick={{ fontSize: 12 }} />
-                  <Tooltip formatter={(v: number) => yen(v)} />
-                  <Bar dataKey="total" name="売上" fill="var(--color-primary)" radius={[4, 4, 0, 0]} />
+                  <Tooltip formatter={(v: number) => formatMetric(v, metric)} />
+                  <Bar
+                    dataKey="value"
+                    name={METRICS.find((m) => m.value === metric)?.label ?? ""}
+                    fill="var(--color-primary)"
+                    radius={[4, 4, 0, 0]}
+                  />
                 </BarChart>
               )}
             </ResponsiveContainer>
@@ -96,6 +120,8 @@ function ChartCard({
 
 function AnalyticsPage() {
   const [year, setYear] = useState<number | null>(new Date().getFullYear());
+  const [metric, setMetric] = useState<Metric>("sales");
+  const settings = useSettings();
   const { data, isLoading } = useQuery({
     queryKey: ["analytics", year],
     queryFn: () => analytics({ data: { year } }),
@@ -103,9 +129,13 @@ function AnalyticsPage() {
 
   const years = data?.years ?? [];
   const options: { label: string; value: number | null }[] = [
-    ...years.map((y) => ({ label: `${y}年`, value: y as number | null })),
     { label: "全期間", value: null },
+    ...years.map((y) => ({ label: `${y}年`, value: y as number | null })),
   ];
+
+  const grossTotal = (data?.monthly ?? []).reduce((s, m) => s + m.total, 0);
+  const visits = (data?.monthly ?? []).reduce((s, m) => s + m.count, 0);
+  const tax = taxBreakdown(grossTotal, settings.taxRate);
 
   return (
     <div className="min-h-screen bg-background">
@@ -125,13 +155,39 @@ function AnalyticsPage() {
             </Button>
           ))}
         </div>
+
+        <Tabs value={metric} onValueChange={(v) => setMetric(v as Metric)}>
+          <TabsList className="w-full">
+            {METRICS.map((m) => (
+              <TabsTrigger key={m.value} value={m.value} className="flex-1">
+                {m.label}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </Tabs>
+
         {isLoading || !data ? (
           <p className="text-muted-foreground">読み込み中...</p>
         ) : (
           <>
-            <ChartCard title="月別の売上推移" data={data.monthly} type="line" />
-            <ChartCard title="曜日別の売上" data={data.weekday} type="bar" />
-            <ChartCard title="時間帯別の売上（30分単位）" data={data.hourly} type="bar" />
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">合計（税率 {settings.taxRate}%）</CardTitle>
+              </CardHeader>
+              <CardContent className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
+                <Stat label="税込金額" value={yen(tax.gross)} />
+                <Stat label="税抜金額" value={yen(tax.net)} />
+                <Stat label="消費税額" value={yen(tax.tax)} />
+                <Stat
+                  label="組数 / 客単価"
+                  value={`${visits.toLocaleString()}組 / ${yen(visits ? Math.round(grossTotal / visits) : 0)}`}
+                />
+              </CardContent>
+            </Card>
+            <ChartCard title="年別" data={data.yearly} type="bar" metric={metric} />
+            <ChartCard title="月別" data={data.monthly} type="line" metric={metric} />
+            <ChartCard title="曜日別" data={data.weekday} type="bar" metric={metric} />
+            <ChartCard title="時間帯別（30分単位）" data={data.hourly} type="bar" metric={metric} />
             <Card>
               <CardHeader>
                 <CardTitle className="text-base">メニュー別 売上ランキング</CardTitle>
@@ -160,6 +216,15 @@ function AnalyticsPage() {
           </>
         )}
       </main>
+    </div>
+  );
+}
+
+function Stat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-md border p-3">
+      <div className="text-xs text-muted-foreground">{label}</div>
+      <div className="font-semibold tabular-nums">{value}</div>
     </div>
   );
 }

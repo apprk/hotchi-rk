@@ -10,6 +10,9 @@ import {
   saleInputSchema,
   saleUpdateSchema,
   analyticsSchema,
+  reorderSchema,
+  dayNoteSchema,
+  restoreSchema,
 } from "@/lib/shop.schemas";
 
 export const listMenus = createServerFn({ method: "GET" })
@@ -60,8 +63,42 @@ export const registerSale = createServerFn({ method: "POST" })
       date: data.date,
       soldAt: data.soldAt,
       note: data.note ?? null,
+      discount: data.discount ?? null,
       items: data.items,
     });
+  });
+
+export const reorderMenuItems = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) => reorderSchema.parse(input))
+  .handler(async ({ data }) => {
+    const { reorderMenus } = await import("@/lib/shop.server");
+    return reorderMenus(data.ids);
+  });
+
+export const fetchDayNote = createServerFn({ method: "GET" })
+  .inputValidator((input: unknown) => dateSchema.parse(input))
+  .handler(async ({ data }) => {
+    const { getDayNote } = await import("@/lib/shop.server");
+    return getDayNote(data.date);
+  });
+
+export const saveDayNoteFn = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) => dayNoteSchema.parse(input))
+  .handler(async ({ data }) => {
+    const { saveDayNote } = await import("@/lib/shop.server");
+    return saveDayNote(data.date, data.note);
+  });
+
+export const exportAllData = createServerFn({ method: "GET" }).handler(async () => {
+  const { exportAll } = await import("@/lib/shop.server");
+  return exportAll();
+});
+
+export const restoreAllData = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) => restoreSchema.parse(input))
+  .handler(async ({ data }) => {
+    const { restoreAll } = await import("@/lib/shop.server");
+    return restoreAll(data.payload);
   });
 
 export const deleteSale = createServerFn({ method: "POST" })

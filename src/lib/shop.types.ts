@@ -22,6 +22,10 @@ export interface Sale {
   sold_at: string;
   total: number;
   note: string | null;
+  subtotal: number | null;
+  discount_type: string | null;
+  discount_value: number | null;
+  discount_amount: number;
   original_sold_at: string | null;
   original_total: number | null;
   original_note: string | null;
@@ -42,6 +46,7 @@ export interface NamedTotal {
 
 export interface Analytics {
   years: number[];
+  yearly: NamedTotal[];
   monthly: NamedTotal[];
   weekday: NamedTotal[];
   hourly: NamedTotal[];

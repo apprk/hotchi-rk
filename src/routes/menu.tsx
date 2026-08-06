@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
-import { Check, Copy, Pencil, Trash2, X } from "lucide-react";
+import { Check, Copy, GripVertical, Pencil, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -17,6 +17,7 @@ import {
   deleteMenuItem,
   listMenus,
   listPastMenus,
+  reorderMenuItems,
   updateMenuItem,
 } from "@/lib/shop.functions";
 
@@ -54,12 +55,15 @@ function MenuPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
   const [editPrice, setEditPrice] = useState("");
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [order, setOrder] = useState<string[] | null>(null);
   const queryClient = useQueryClient();
 
   const addFn = useServerFn(addMenuItem);
   const deleteFn = useServerFn(deleteMenuItem);
   const copyFn = useServerFn(copyMenuFromDate);
   const updateFn = useServerFn(updateMenuItem);
+  const reorderFn = useServerFn(reorderMenuItems);
 
   const menusQuery = useQuery({
     queryKey: ["menus", date],
@@ -68,6 +72,7 @@ function MenuPage() {
   const pastQuery = useQuery({ queryKey: ["pastMenus"], queryFn: () => listPastMenus() });
 
   function refresh() {
+    setOrder(null);
     queryClient.invalidateQueries({ queryKey: ["menus", date] });
     queryClient.invalidateQueries({ queryKey: ["pastMenus"] });
   }
@@ -116,16 +121,41 @@ function MenuPage() {
     }
   }
 
-  async function handleDuplicate(menu: { name: string; price: number }) {
+  async function handleClipboardCopy(menu: { name: string; price: number }) {
+    const text = `${menu.name}　￥${menu.price.toLocaleString()}`;
     try {
-      const created = await addFn({ data: { date, name: menu.name, price: menu.price } });
-      refresh();
-      setEditingId(created.id);
-      setEditName(created.name);
-      setEditPrice(String(created.price));
-      toast.success("コピーしました。内容を編集できます");
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text);
+      } else {
+        const el = document.createElement("textarea");
+        el.value = text;
+        el.style.position = "fixed";
+        el.style.opacity = "0";
+        document.body.appendChild(el);
+        el.select();
+        document.execCommand("copy");
+        document.body.removeChild(el);
+      }
+      toast.success(`コピーしました：${text}`);
+    } catch {
+      toast.error("コピーできませんでした");
+    }
+  }
+
+  async function handleDrop(targetId: string) {
+    if (!dragId || dragId === targetId) return;
+    const ids = displayMenus.map((m) => m.id);
+    const from = ids.indexOf(dragId);
+    const to = ids.indexOf(targetId);
+    if (from < 0 || to < 0) return;
+    ids.splice(to, 0, ids.splice(from, 1)[0] as string);
+    setOrder(ids);
+    setDragId(null);
+    try {
+      await reorderFn({ data: { ids } });
+      queryClient.invalidateQueries({ queryKey: ["menus", date] });
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "コピーに失敗しました");
+      toast.error(error instanceof Error ? error.message : "並び替えに失敗しました");
     }
   }
 
@@ -144,6 +174,9 @@ function MenuPage() {
   }
 
   const menus = menusQuery.data ?? [];
+  const displayMenus = order
+    ? order.map((id) => menus.find((m) => m.id === id)).filter((m): m is (typeof menus)[number] => Boolean(m))
+    : menus;
 
   return (
     <div className="min-h-screen bg-background">
@@ -252,8 +285,16 @@ function MenuPage() {
               <p className="text-sm text-muted-foreground">まだ登録されていません。</p>
             ) : (
               <ul className="divide-y">
-                {menus.map((menu) => (
-                  <li key={menu.id} className="py-2">
+                <li className="pb-2 text-xs text-muted-foreground">
+                  左のハンドルをドラッグすると並び順を変更できます（レジ画面にも反映されます）。
+                </li>
+                {displayMenus.map((menu) => (
+                  <li
+                    key={menu.id}
+                    className={`py-2 ${dragId === menu.id ? "opacity-50" : ""}`}
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={() => handleDrop(menu.id)}
+                  >
                     {editingId === menu.id ? (
                       <div className="flex flex-wrap items-center gap-2">
                         <Input
@@ -286,7 +327,18 @@ function MenuPage() {
                       </div>
                     ) : (
                       <div className="flex items-center justify-between">
-                        <span>{menu.name}</span>
+                        <span className="flex items-center gap-2">
+                          <span
+                            draggable
+                            onDragStart={() => setDragId(menu.id)}
+                            onDragEnd={() => setDragId(null)}
+                            className="cursor-grab text-muted-foreground active:cursor-grabbing"
+                            aria-label="ドラッグして並び替え"
+                          >
+                            <GripVertical className="h-4 w-4" />
+                          </span>
+                          {menu.name}
+                        </span>
                         <div className="flex items-center gap-1">
                           <span className="mr-2 tabular-nums">¥{menu.price.toLocaleString()}</span>
                           <Button
@@ -304,8 +356,8 @@ function MenuPage() {
                           <Button
                             variant="ghost"
                             size="icon"
-                            onClick={() => handleDuplicate(menu)}
-                            aria-label={`${menu.name}をコピー`}
+                            onClick={() => handleClipboardCopy(menu)}
+                            aria-label={`${menu.name}をクリップボードにコピー`}
                           >
                             <Copy className="h-4 w-4" />
                           </Button>

@@ -14,6 +14,30 @@ export type Database = {
   }
   public: {
     Tables: {
+      day_notes: {
+        Row: {
+          created_at: string
+          date: string
+          id: string
+          note: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          date: string
+          id?: string
+          note?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          date?: string
+          id?: string
+          note?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       menu_items: {
         Row: {
           created_at: string
@@ -102,36 +126,48 @@ export type Database = {
         Row: {
           created_at: string
           date: string
+          discount_amount: number
+          discount_type: string | null
+          discount_value: number | null
           id: string
           note: string | null
           original_note: string | null
           original_sold_at: string | null
           original_total: number | null
           sold_at: string
+          subtotal: number | null
           total: number
           updated_at: string
         }
         Insert: {
           created_at?: string
           date?: string
+          discount_amount?: number
+          discount_type?: string | null
+          discount_value?: number | null
           id?: string
           note?: string | null
           original_note?: string | null
           original_sold_at?: string | null
           original_total?: number | null
           sold_at?: string
+          subtotal?: number | null
           total?: number
           updated_at?: string
         }
         Update: {
           created_at?: string
           date?: string
+          discount_amount?: number
+          discount_type?: string | null
+          discount_value?: number | null
           id?: string
           note?: string | null
           original_note?: string | null
           original_sold_at?: string | null
           original_total?: number | null
           sold_at?: string
+          subtotal?: number | null
           total?: number
           updated_at?: string
         }

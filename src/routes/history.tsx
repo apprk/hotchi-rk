@@ -6,6 +6,7 @@ import { ChevronLeft, ChevronRight, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   AlertDialog,
@@ -20,8 +21,16 @@ import {
 import { Toaster } from "@/components/ui/sonner";
 import { AppNav } from "@/components/shop/AppNav";
 import { SaleEditDialog } from "@/components/shop/SaleEditDialog";
-import { deleteSale, listSales, monthTotals } from "@/lib/shop.functions";
+import {
+  deleteSale,
+  fetchDayNote,
+  listSales,
+  monthTotals,
+  saveDayNoteFn,
+} from "@/lib/shop.functions";
+import { taxBreakdown, useSettings, yen } from "@/lib/settings";
 import { useQueryClient } from "@tanstack/react-query";
+import { useEffect } from "react";
 
 const WEEKDAYS = ["日", "月", "火", "水", "木", "金", "土"];
 
@@ -61,6 +70,10 @@ function HistoryPage() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const queryClient = useQueryClient();
   const deleteSaleFn = useServerFn(deleteSale);
+  const saveNoteFn = useServerFn(saveDayNoteFn);
+  const settings = useSettings();
+  const [memo, setMemo] = useState("");
+  const [savingMemo, setSavingMemo] = useState(false);
 
   const monthKey = `${year}-${pad(month + 1)}`;
   const totalsQuery = useQuery({
@@ -72,6 +85,29 @@ function HistoryPage() {
     queryFn: () => listSales({ data: { date: selected as string } }),
     enabled: Boolean(selected),
   });
+  const noteQuery = useQuery({
+    queryKey: ["dayNote", selected],
+    queryFn: () => fetchDayNote({ data: { date: selected as string } }),
+    enabled: Boolean(selected),
+  });
+
+  useEffect(() => {
+    setMemo(noteQuery.data ?? "");
+  }, [noteQuery.data, selected]);
+
+  async function handleSaveMemo() {
+    if (!selected) return;
+    setSavingMemo(true);
+    try {
+      await saveNoteFn({ data: { date: selected, note: memo } });
+      toast.success("メモを保存しました");
+      queryClient.invalidateQueries({ queryKey: ["dayNote", selected] });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "保存に失敗しました");
+    } finally {
+      setSavingMemo(false);
+    }
+  }
 
   const totalsMap = new Map((totalsQuery.data ?? []).map((t) => [t.date, t]));
   const monthTotal = (totalsQuery.data ?? []).reduce((s, t) => s + t.total, 0);
@@ -108,6 +144,8 @@ function HistoryPage() {
   }
 
   const sales = salesQuery.data ?? [];
+  const dayGross = sales.reduce((s, x) => s + x.total, 0);
+  const dayTax = taxBreakdown(dayGross, settings.taxRate);
 
   return (
     <div className="min-h-screen bg-background">
@@ -171,9 +209,12 @@ function HistoryPage() {
           <Card>
             <CardHeader>
               <CardTitle className="text-base">
-                {selected} ・ {sales.length}組 ・ ¥
-                {sales.reduce((s, x) => s + x.total, 0).toLocaleString()}
+                {selected} ・ {sales.length}組 ・ {yen(dayGross)}
               </CardTitle>
+              <p className="text-xs text-muted-foreground">
+                税抜 {yen(dayTax.net)} ／ 消費税({settings.taxRate}%) {yen(dayTax.tax)} ／ 税込{" "}
+                {yen(dayTax.gross)}
+              </p>
             </CardHeader>
             <CardContent>
               {salesQuery.isLoading ? (
@@ -200,7 +241,7 @@ function HistoryPage() {
                             </span>
                           </span>
                           <span className="font-medium tabular-nums">
-                            ¥{sale.total.toLocaleString()}
+                            {yen(sale.total)}
                           </span>
                         </button>
                         <Button
@@ -221,18 +262,61 @@ function HistoryPage() {
                         </Button>
                       </div>
                       {openSale === sale.id && (
-                        <ul className="mt-2 space-y-1 rounded-md bg-muted/50 p-3 text-sm">
-                          {sale.items.map((item) => (
-                            <li key={item.id} className="flex justify-between">
-                              <span>
-                                {item.name} × {item.quantity}
-                              </span>
-                              <span className="tabular-nums">
-                                ¥{(item.unit_price * item.quantity).toLocaleString()}
-                              </span>
-                            </li>
-                          ))}
-                        </ul>
+                        <div className="mt-2 space-y-2 rounded-md bg-muted/50 p-3 text-sm">
+                          <ul className="space-y-1">
+                            {sale.items.map((item) => (
+                              <li key={item.id} className="flex justify-between">
+                                <span>
+                                  {item.name} × {item.quantity}
+                                </span>
+                                <span className="tabular-nums">
+                                  {yen(item.unit_price * item.quantity)}
+                                </span>
+                              </li>
+                            ))}
+                          </ul>
+                          <div className="space-y-1 border-t pt-2 text-xs text-muted-foreground">
+                            {sale.discount_amount > 0 && (
+                              <>
+                                <div className="flex justify-between">
+                                  <span>割引前金額</span>
+                                  <span className="tabular-nums">
+                                    {yen(sale.subtotal ?? sale.total + sale.discount_amount)}
+                                  </span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span>
+                                    割引（
+                                    {sale.discount_type === "percent"
+                                      ? `${sale.discount_value ?? 0}％引き`
+                                      : `${(sale.discount_value ?? 0).toLocaleString()}円引き`}
+                                    ）
+                                  </span>
+                                  <span className="tabular-nums">-{yen(sale.discount_amount)}</span>
+                                </div>
+                              </>
+                            )}
+                            {(() => {
+                              const t = taxBreakdown(sale.total, settings.taxRate);
+                              return (
+                                <>
+                                  <div className="flex justify-between">
+                                    <span>税抜金額</span>
+                                    <span className="tabular-nums">{yen(t.net)}</span>
+                                  </div>
+                                  <div className="flex justify-between">
+                                    <span>消費税（{settings.taxRate}%）</span>
+                                    <span className="tabular-nums">{yen(t.tax)}</span>
+                                  </div>
+                                  <div className="flex justify-between font-medium text-foreground">
+                                    <span>税込金額</span>
+                                    <span className="tabular-nums">{yen(t.gross)}</span>
+                                  </div>
+                                </>
+                              );
+                            })()}
+                          </div>
+                        </div>
                       )}
                       {editingId === sale.id && (
                         <SaleEditDialog
@@ -247,6 +331,28 @@ function HistoryPage() {
                   ))}
                 </ul>
               )}
+            </CardContent>
+          </Card>
+        )}
+
+        {selected && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">{selected} の日別メモ</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <Textarea
+                value={memo}
+                onChange={(e) => setMemo(e.target.value)}
+                rows={4}
+                maxLength={2000}
+                placeholder="雨天で来客少なめ / イベント出店 / 臨時休業 など"
+              />
+              <div className="flex justify-end">
+                <Button onClick={handleSaveMemo} disabled={savingMemo}>
+                  {savingMemo ? "保存中..." : "メモを保存"}
+                </Button>
+              </div>
             </CardContent>
           </Card>
         )}

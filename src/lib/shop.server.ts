@@ -163,7 +163,22 @@ export async function updateSale(input: {
   items: { id?: string | null; name: string; unitPrice: number; quantity: number }[];
 }) {
   const supabase = client();
-  const total = input.items.reduce((sum, i) => sum + i.unitPrice * i.quantity, 0);
+  const subtotal = input.items.reduce((sum, i) => sum + i.unitPrice * i.quantity, 0);
+  const { data: current } = await supabase
+    .from("sales")
+    .select("discount_type, discount_value")
+    .eq("id", input.id)
+    .single();
+  const discountAmount = computeDiscount(
+    subtotal,
+    current?.discount_type
+      ? {
+          type: current.discount_type as "yen" | "percent",
+          value: current.discount_value ?? 0,
+        }
+      : null,
+  );
+  const total = Math.max(0, subtotal - discountAmount);
 
   const { data: existing, error: existingError } = await supabase
     .from("sale_items")
@@ -201,7 +216,14 @@ export async function updateSale(input: {
   const date = `${soldAt.getFullYear()}-${String(soldAt.getMonth() + 1).padStart(2, "0")}-${String(soldAt.getDate()).padStart(2, "0")}`;
   const { error } = await supabase
     .from("sales")
-    .update({ sold_at: input.soldAt, note: input.note, total, date })
+    .update({
+      sold_at: input.soldAt,
+      note: input.note,
+      total,
+      date,
+      subtotal,
+      discount_amount: discountAmount,
+    })
     .eq("id", input.id);
   if (error) throw new Error(error.message);
   return { success: true, total };
@@ -211,7 +233,9 @@ export async function getSalesByDate(date: string): Promise<Sale[]> {
   const supabase = client();
   const { data: sales, error } = await supabase
     .from("sales")
-    .select("id, date, sold_at, total, note, original_sold_at, original_total, original_note")
+    .select(
+      "id, date, sold_at, total, note, subtotal, discount_type, discount_value, discount_amount, original_sold_at, original_total, original_note",
+    )
     .eq("date", date)
     .order("sold_at", { ascending: true });
   if (error) throw new Error(error.message);

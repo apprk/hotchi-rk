@@ -25,6 +25,25 @@ export const analyticsSchema = z.object({
   year: z.coerce.number().int().min(2000).max(2999).nullable().optional(),
 });
 
+export const discountSchema = z
+  .object({
+    type: z.enum(["yen", "percent"]).nullable(),
+    value: z.coerce.number().min(0).max(1000000),
+  })
+  .nullable()
+  .optional();
+
+export const reorderSchema = z.object({ ids: z.array(z.string().uuid()).min(1) });
+
+export const dayNoteSchema = z.object({
+  date: z.string().date(),
+  note: z.string().max(2000),
+});
+
+export const restoreSchema = z.object({
+  payload: z.string().min(2).max(5_000_000),
+});
+
 export const saleUpdateSchema = z.object({
   id: z.string().uuid(),
   soldAt: z.string().min(1),
@@ -45,6 +64,7 @@ export const saleInputSchema = z.object({
   date: z.string().date(),
   soldAt: z.string().min(1),
   note: z.string().trim().max(200).nullable().optional(),
+  discount: discountSchema,
   items: z
     .array(
       z.object({

@@ -371,3 +371,74 @@ export async function getAnalytics(year: number | null): Promise<Analytics> {
     menus: Array.from(menus.values()).sort((a, b) => b.total - a.total),
   };
 }
+export async function getDayNote(date: string): Promise<string> {
+  const { data, error } = await client()
+    .from("day_notes")
+    .select("note")
+    .eq("date", date)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  return data?.note ?? "";
+}
+
+export async function saveDayNote(date: string, note: string) {
+  const { error } = await client()
+    .from("day_notes")
+    .upsert({ date, note }, { onConflict: "date" });
+  if (error) throw new Error(error.message);
+  return { success: true };
+}
+
+export async function exportAll() {
+  const supabase = client();
+  const [menus, sales, items, notes] = await Promise.all([
+    supabase.from("menu_items").select("*"),
+    supabase.from("sales").select("*"),
+    supabase.from("sale_items").select("*"),
+    supabase.from("day_notes").select("*"),
+  ]);
+  const err = menus.error ?? sales.error ?? items.error ?? notes.error;
+  if (err) throw new Error(err.message);
+  return {
+    exportedAt: new Date().toISOString(),
+    menus: menus.data ?? [],
+    sales: sales.data ?? [],
+    saleItems: items.data ?? [],
+    dayNotes: notes.data ?? [],
+  };
+}
+
+export async function restoreAll(payload: string) {
+  const supabase = client();
+  const parsed = JSON.parse(payload) as Awaited<ReturnType<typeof exportAll>>;
+  if (!parsed || !Array.isArray(parsed.menus) || !Array.isArray(parsed.sales)) {
+    throw new Error("バックアップファイルの形式が正しくありません");
+  }
+  const counts = { menus: 0, sales: 0, saleItems: 0, dayNotes: 0 };
+
+  if (parsed.menus.length > 0) {
+    const { error } = await supabase.from("menu_items").upsert(parsed.menus, { onConflict: "id" });
+    if (error) throw new Error(error.message);
+    counts.menus = parsed.menus.length;
+  }
+  if (parsed.sales.length > 0) {
+    const { error } = await supabase.from("sales").upsert(parsed.sales, { onConflict: "id" });
+    if (error) throw new Error(error.message);
+    counts.sales = parsed.sales.length;
+  }
+  if (Array.isArray(parsed.saleItems) && parsed.saleItems.length > 0) {
+    const { error } = await supabase
+      .from("sale_items")
+      .upsert(parsed.saleItems, { onConflict: "id" });
+    if (error) throw new Error(error.message);
+    counts.saleItems = parsed.saleItems.length;
+  }
+  if (Array.isArray(parsed.dayNotes) && parsed.dayNotes.length > 0) {
+    const { error } = await supabase
+      .from("day_notes")
+      .upsert(parsed.dayNotes, { onConflict: "date" });
+    if (error) throw new Error(error.message);
+    counts.dayNotes = parsed.dayNotes.length;
+  }
+  return counts;
+}

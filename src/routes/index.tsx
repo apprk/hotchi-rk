@@ -159,10 +159,20 @@ function RegisterPage() {
               <p className="text-xs text-muted-foreground">{settings.shopName}</p>
             </div>
           </div>
-          <Button variant="outline" size="sm" onClick={() => setCustomerView(false)}>
-            <X className="mr-1 h-4 w-4" />
-            スタッフ画面へ
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant={customerChangeOpen ? "default" : "outline"}
+              size="sm"
+              onClick={() => setCustomerChangeOpen((v) => !v)}
+            >
+              <Calculator className="mr-1 h-4 w-4" />
+              お釣り計算
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => setCustomerView(false)}>
+              <X className="mr-1 h-4 w-4" />
+              スタッフ画面へ
+            </Button>
+          </div>
         </div>
         <div className="flex flex-1 flex-col justify-between px-6 py-6">
           {lines.length === 0 ? (
@@ -196,16 +206,49 @@ function RegisterPage() {
               {yen(total)}
             </div>
           </div>
+          {customerChangeOpen && (
+            <div className="mt-4 rounded-lg border px-6 py-5">
+              <Label htmlFor="customer-received" className="text-base">
+                お預かり金額
+              </Label>
+              <Input
+                id="customer-received"
+                type="number"
+                min={0}
+                inputMode="numeric"
+                value={customerReceived}
+                onChange={(e) => setCustomerReceived(e.target.value)}
+                placeholder="1000"
+                className="mt-2 h-14 text-2xl"
+              />
+              {customerReceived !== "" && (
+                <div className="mt-4 space-y-1 text-right">
+                  <div className="text-lg text-muted-foreground">
+                    お預かり {yen(Number(customerReceived) || 0)}
+                  </div>
+                  <div className="text-base text-muted-foreground">お釣り</div>
+                  <div className="text-4xl font-bold tabular-nums text-primary">
+                    {(Number(customerReceived) || 0) - total < 0
+                      ? "—"
+                      : yen((Number(customerReceived) || 0) - total)}
+                  </div>
+                  {(Number(customerReceived) || 0) - total < 0 && (
+                    <p className="text-sm text-destructive">お預かり金額が不足しています</p>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background pb-32">
+    <div className="min-h-screen bg-background pb-48">
       <Toaster position="top-center" />
       <AppNav />
-      <main className="mx-auto max-w-5xl px-4 py-6">
+      <main className="mx-auto max-w-5xl px-4 py-6 pb-16">
         <header className="mb-4 flex flex-wrap items-end justify-between gap-3">
           <div>
             <h1 className="text-2xl font-bold tracking-tight">レジ</h1>

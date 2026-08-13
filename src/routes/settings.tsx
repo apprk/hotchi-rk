@@ -27,6 +27,7 @@ import {
   DEFAULT_SETTINGS,
   readSettings,
   resetSettings,
+  signOut,
   writeSettings,
   type AppSettings,
 } from "@/lib/settings";
@@ -64,6 +65,60 @@ function csvEscape(value: unknown) {
 }
 
 function SettingsPage() {
+  const [unlocked, setUnlocked] = useState(false);
+  const [pinInput, setPinInput] = useState("");
+  const [pinError, setPinError] = useState(false);
+
+  if (!unlocked) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Toaster position="top-center" />
+        <AppNav />
+        <main className="mx-auto max-w-sm px-4 py-16">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">設定パスワード</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <p className="text-sm text-muted-foreground">
+                設定画面を開くにはパスワードを入力してください。
+              </p>
+              <Input
+                type="password"
+                inputMode="numeric"
+                maxLength={8}
+                value={pinInput}
+                onChange={(e) => {
+                  setPinInput(e.target.value);
+                  setPinError(false);
+                }}
+                placeholder="0000"
+                aria-label="設定パスワード"
+              />
+              {pinError && <p className="text-sm text-destructive">パスワードが違います</p>}
+              <Button
+                className="w-full"
+                onClick={() => {
+                  if (pinInput === readSettings().password) setUnlocked(true);
+                  else {
+                    setPinError(true);
+                    setPinInput("");
+                  }
+                }}
+              >
+                開く
+              </Button>
+            </CardContent>
+          </Card>
+        </main>
+      </div>
+    );
+  }
+
+  return <SettingsContent />;
+}
+
+function SettingsContent() {
   const [form, setForm] = useState<AppSettings>(DEFAULT_SETTINGS);
   const [newPin, setNewPin] = useState("");
   const [busy, setBusy] = useState(false);

@@ -96,7 +96,7 @@ function RegisterPage() {
   const visibleMenus = menus;
   const discountLabel = discount
     ? discount.type === "yen"
-      ? `${discount.value.toLocaleString()}円引き`
+      ? `${yen(discount.value)}引き`
       : `${discount.value}％引き`
     : null;
 

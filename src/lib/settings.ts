@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 
-export const APP_VERSION = "1.2.0";
+export const APP_VERSION = "1.3.0";
+export const APP_NAME = "mnmrk";
 
 export interface AppSettings {
   shopName: string;
@@ -8,6 +9,7 @@ export interface AppSettings {
   taxRate: number;
   password: string;
   authEnabled: boolean;
+  authDays: number;
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -16,11 +18,16 @@ export const DEFAULT_SETTINGS: AppSettings = {
   taxRate: 8,
   password: "0000",
   authEnabled: true,
+  authDays: 30,
 };
 
 const SETTINGS_KEY = "hotchi.settings.v1";
 export const AUTH_KEY = "hotchi.auth.v1";
 export const AUTH_DAYS = 30;
+
+export function signOut() {
+  window.localStorage.removeItem(AUTH_KEY);
+}
 
 const listeners = new Set<(s: AppSettings) => void>();
 

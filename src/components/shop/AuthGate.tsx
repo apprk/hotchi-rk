@@ -2,7 +2,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { Delete } from "lucide-react";
 
 import { ShopLogo } from "@/components/shop/ShopLogo";
-import { AUTH_DAYS, AUTH_KEY, readSettings } from "@/lib/settings";
+import { AUTH_KEY, readSettings } from "@/lib/settings";
 import { cn } from "@/lib/utils";
 
 function isUnlocked() {
@@ -34,7 +34,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
     if (pin === settings.password) {
       window.localStorage.setItem(
         AUTH_KEY,
-        String(Date.now() + AUTH_DAYS * 24 * 60 * 60 * 1000),
+        String(Date.now() + Math.max(1, settings.authDays) * 24 * 60 * 60 * 1000),
       );
       setUnlocked(true);
     } else {

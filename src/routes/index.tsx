@@ -241,17 +241,6 @@ function RegisterPage() {
           </div>
         </header>
 
-        <div className="relative mb-4">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="商品を検索"
-            className="pl-9"
-            aria-label="商品検索"
-          />
-        </div>
-
         {menusQuery.isLoading ? (
           <p className="text-muted-foreground">読み込み中...</p>
         ) : menus.length === 0 ? (
@@ -263,8 +252,6 @@ function RegisterPage() {
               </Button>
             </CardContent>
           </Card>
-        ) : visibleMenus.length === 0 ? (
-          <p className="text-sm text-muted-foreground">「{search}」に一致する商品はありません。</p>
         ) : (
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {visibleMenus.map((menu) => {

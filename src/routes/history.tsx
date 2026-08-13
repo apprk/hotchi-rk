@@ -41,12 +41,12 @@ function pad(n: number) {
 export const Route = createFileRoute("/history")({
   head: () => ({
     meta: [
-      { title: "売上履歴カレンダー | 総菜屋の売上台帳" },
+      { title: "売上履歴カレンダー | mnmrk" },
       {
         name: "description",
         content: "カレンダーから日付を選んで、その日のお客さんごとの購入内容と金額を確認できます。",
       },
-      { property: "og:title", content: "売上履歴カレンダー | 総菜屋の売上台帳" },
+      { property: "og:title", content: "売上履歴カレンダー | mnmrk" },
       {
         property: "og:description",
         content: "日付ごと・お客さんごとの購入明細をさかのぼって確認できます。",
@@ -111,6 +111,7 @@ function HistoryPage() {
 
   const totalsMap = new Map((totalsQuery.data ?? []).map((t) => [t.date, t]));
   const monthTotal = (totalsQuery.data ?? []).reduce((s, t) => s + t.total, 0);
+  const monthTax = taxBreakdown(monthTotal, settings.taxRate);
 
   const firstDay = new Date(year, month, 1).getDay();
   const daysInMonth = new Date(year, month + 1, 0).getDate();
@@ -159,9 +160,15 @@ function HistoryPage() {
             <Button variant="ghost" size="icon" onClick={() => shift(-1)} aria-label="前の月">
               <ChevronLeft className="h-4 w-4" />
             </Button>
-            <CardTitle className="text-base">
-              {year}年{month + 1}月 ・ ¥{monthTotal.toLocaleString()}
-            </CardTitle>
+            <div className="text-center">
+              <CardTitle className="text-base">
+                {year}年{month + 1}月 ・ {yen(monthTotal)}
+              </CardTitle>
+              <p className="mt-1 text-xs text-muted-foreground">
+                税抜 {yen(monthTax.net)} ／ 消費税({settings.taxRate}%) {yen(monthTax.tax)} ／ 税込{" "}
+                {yen(monthTax.gross)}
+              </p>
+            </div>
             <Button variant="ghost" size="icon" onClick={() => shift(1)} aria-label="次の月">
               <ChevronRight className="h-4 w-4" />
             </Button>
@@ -195,7 +202,7 @@ function HistoryPage() {
                     <span className="font-medium">{day}</span>
                     {info && (
                       <span className="mt-1 text-[10px] tabular-nums text-primary">
-                        ¥{info.total.toLocaleString()}
+                        {yen(info.total)}
                       </span>
                     )}
                   </button>
@@ -289,10 +296,14 @@ function HistoryPage() {
                                     割引（
                                     {sale.discount_type === "percent"
                                       ? `${sale.discount_value ?? 0}％引き`
-                                      : `${(sale.discount_value ?? 0).toLocaleString()}円引き`}
+                                      : `${yen(sale.discount_value ?? 0)}引き`}
                                     ）
                                   </span>
                                   <span className="tabular-nums">-{yen(sale.discount_amount)}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span>割引後金額</span>
+                                  <span className="tabular-nums">{yen(sale.total)}</span>
                                 </div>
                               </>
                             )}

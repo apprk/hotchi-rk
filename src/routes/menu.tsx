@@ -29,12 +29,12 @@ function todayString() {
 export const Route = createFileRoute("/menu")({
   head: () => ({
     meta: [
-      { title: "日替わりメニュー設定 | 総菜屋の売上台帳" },
+      { title: "日替わりメニュー設定 | mnmrk" },
       {
         name: "description",
         content: "その日に販売するお惣菜の名前と値段を登録・編集できます。過去の日付からのコピーにも対応。",
       },
-      { property: "og:title", content: "日替わりメニュー設定 | 総菜屋の売上台帳" },
+      { property: "og:title", content: "日替わりメニュー設定 | mnmrk" },
       {
         property: "og:description",
         content: "その日に販売するお惣菜の名前と値段を登録・編集できます。",
@@ -57,6 +57,7 @@ function MenuPage() {
   const [editPrice, setEditPrice] = useState("");
   const [dragId, setDragId] = useState<string | null>(null);
   const [order, setOrder] = useState<string[] | null>(null);
+  const [showSuggest, setShowSuggest] = useState(false);
   const queryClient = useQueryClient();
 
   const addFn = useServerFn(addMenuItem);
@@ -174,6 +175,10 @@ function MenuPage() {
   }
 
   const menus = menusQuery.data ?? [];
+  const query = name.trim().toLowerCase();
+  const suggestions = (pastQuery.data ?? [])
+    .filter((m) => (query ? m.name.toLowerCase().includes(query) : true))
+    .slice(0, 12);
   const displayMenus = order
     ? order.map((id) => menus.find((m) => m.id === id)).filter((m): m is (typeof menus)[number] => Boolean(m))
     : menus;
@@ -205,21 +210,44 @@ function MenuPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             <form onSubmit={handleAdd} className="flex flex-wrap items-end gap-3">
-              <div className="min-w-40 flex-1 space-y-1">
+              <div className="relative min-w-40 flex-1 space-y-1">
                 <Label htmlFor="name">メニュー名</Label>
                 <Input
                   id="name"
                   value={name}
-                  onChange={(e) => setName(e.target.value)}
+                  onChange={(e) => {
+                    setName(e.target.value);
+                    setShowSuggest(true);
+                  }}
+                  onFocus={() => setShowSuggest(true)}
+                  onBlur={() => window.setTimeout(() => setShowSuggest(false), 150)}
+                  autoComplete="off"
                   placeholder="唐揚げ"
                   maxLength={60}
-                  list="past-menus"
                 />
-                <datalist id="past-menus">
-                  {(pastQuery.data ?? []).map((m) => (
-                    <option key={m.name} value={m.name} />
-                  ))}
-                </datalist>
+                {showSuggest && suggestions.length > 0 && (
+                  <ul className="absolute z-30 mt-1 max-h-60 w-full overflow-y-auto rounded-md border bg-popover p-1 shadow-md">
+                    {suggestions.map((m) => (
+                      <li key={m.name}>
+                        <button
+                          type="button"
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={() => {
+                            setName(m.name);
+                            setPrice(String(m.price));
+                            setShowSuggest(false);
+                          }}
+                          className="flex w-full items-center justify-between rounded-sm px-3 py-2 text-left text-sm hover:bg-accent"
+                        >
+                          <span>{m.name}</span>
+                          <span className="tabular-nums text-muted-foreground">
+                            ￥{m.price.toLocaleString()}
+                          </span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
               <div className="w-32 space-y-1">
                 <Label htmlFor="price">値段</Label>
@@ -237,24 +265,6 @@ function MenuPage() {
                 追加
               </Button>
             </form>
-
-            {(pastQuery.data ?? []).length > 0 && (
-              <div className="flex flex-wrap gap-2">
-                {(pastQuery.data ?? []).slice(0, 12).map((m) => (
-                  <button
-                    key={m.name}
-                    type="button"
-                    onClick={() => {
-                      setName(m.name);
-                      setPrice(String(m.price));
-                    }}
-                    className="rounded-full border px-3 py-1 text-xs text-muted-foreground transition-colors hover:bg-accent"
-                  >
-                    {m.name} ¥{m.price.toLocaleString()}
-                  </button>
-                ))}
-              </div>
-            )}
 
             <div className="flex flex-wrap items-end gap-3 border-t pt-4">
               <div className="space-y-1">

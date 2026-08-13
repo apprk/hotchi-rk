@@ -27,6 +27,7 @@ import {
   DEFAULT_SETTINGS,
   readSettings,
   resetSettings,
+  signOut,
   writeSettings,
   type AppSettings,
 } from "@/lib/settings";
@@ -34,12 +35,12 @@ import {
 export const Route = createFileRoute("/settings")({
   head: () => ({
     meta: [
-      { title: "設定 | ほっち 売上台帳" },
+      { title: "設定 | mnmrk" },
       {
         name: "description",
         content: "店舗名・電話番号・消費税率・レジのパスワード・CSV出力やバックアップを管理できます。",
       },
-      { property: "og:title", content: "設定 | ほっち 売上台帳" },
+      { property: "og:title", content: "設定 | mnmrk" },
       { property: "og:description", content: "税率やパスワード、データ出力の設定画面です。" },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
@@ -64,6 +65,60 @@ function csvEscape(value: unknown) {
 }
 
 function SettingsPage() {
+  const [unlocked, setUnlocked] = useState(false);
+  const [pinInput, setPinInput] = useState("");
+  const [pinError, setPinError] = useState(false);
+
+  if (!unlocked) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Toaster position="top-center" />
+        <AppNav />
+        <main className="mx-auto max-w-sm px-4 py-16">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">設定パスワード</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <p className="text-sm text-muted-foreground">
+                設定画面を開くにはパスワードを入力してください。
+              </p>
+              <Input
+                type="password"
+                inputMode="numeric"
+                maxLength={8}
+                value={pinInput}
+                onChange={(e) => {
+                  setPinInput(e.target.value);
+                  setPinError(false);
+                }}
+                placeholder="0000"
+                aria-label="設定パスワード"
+              />
+              {pinError && <p className="text-sm text-destructive">パスワードが違います</p>}
+              <Button
+                className="w-full"
+                onClick={() => {
+                  if (pinInput === readSettings().password) setUnlocked(true);
+                  else {
+                    setPinError(true);
+                    setPinInput("");
+                  }
+                }}
+              >
+                開く
+              </Button>
+            </CardContent>
+          </Card>
+        </main>
+      </div>
+    );
+  }
+
+  return <SettingsContent />;
+}
+
+function SettingsContent() {
   const [form, setForm] = useState<AppSettings>(DEFAULT_SETTINGS);
   const [newPin, setNewPin] = useState("");
   const [busy, setBusy] = useState(false);
@@ -211,12 +266,33 @@ function SettingsPage() {
             <div className="flex items-center justify-between">
               <div>
                 <Label htmlFor="authEnabled">起動時のパスワード認証</Label>
-                <p className="text-xs text-muted-foreground">30日間は再入力不要です。</p>
+                <p className="text-xs text-muted-foreground">
+                  設定した日数のあいだ再入力が不要になります。
+                </p>
               </div>
               <Switch
                 id="authEnabled"
                 checked={form.authEnabled}
                 onCheckedChange={(checked) => save({ authEnabled: checked })}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="authDays">ログイン保持日数</Label>
+              <Input
+                id="authDays"
+                type="number"
+                min={1}
+                max={365}
+                value={form.authDays}
+                onChange={(e) => setForm({ ...form, authDays: Number(e.target.value) })}
+                onBlur={() =>
+                  save({
+                    authDays: Number.isFinite(form.authDays)
+                      ? Math.min(365, Math.max(1, Math.round(form.authDays)))
+                      : 30,
+                  })
+                }
+                className="w-32"
               />
             </div>
             <div className="flex flex-wrap items-end gap-3">
@@ -244,6 +320,17 @@ function SettingsPage() {
                 }}
               >
                 変更する
+              </Button>
+            </div>
+            <div className="border-t pt-4">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  signOut();
+                  window.location.href = "/";
+                }}
+              >
+                ログアウト
               </Button>
             </div>
           </CardContent>

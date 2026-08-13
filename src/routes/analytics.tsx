@@ -24,12 +24,12 @@ import type { NamedTotal } from "@/lib/shop.types";
 export const Route = createFileRoute("/analytics")({
   head: () => ({
     meta: [
-      { title: "売上分析 | 総菜屋の売上台帳" },
+      { title: "売上分析 | mnmrk" },
       {
         name: "description",
         content: "月ごとの売上推移、曜日別・時間帯別の比較、メニュー別の売上ランキングを確認できます。",
       },
-      { property: "og:title", content: "売上分析 | 総菜屋の売上台帳" },
+      { property: "og:title", content: "売上分析 | mnmrk" },
       {
         property: "og:description",
         content: "月別推移・曜日別・時間帯別・メニュー別に売上を比較できます。",

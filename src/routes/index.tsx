@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useMemo, useState } from "react";
-import { Calculator, Minus, MonitorSmartphone, Percent, Plus, Search, Trash2, X } from "lucide-react";
+import { Calculator, Minus, MonitorSmartphone, Percent, Plus, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -31,12 +31,12 @@ function todayString() {
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "レジ | 総菜屋の売上台帳" },
+      { title: "レジ | mnmrk" },
       {
         name: "description",
         content: "日替わりメニューをタップするだけで合計金額を計算し、売上を記録できるお惣菜屋さん向けレジアプリ。",
       },
-      { property: "og:title", content: "レジ | 総菜屋の売上台帳" },
+      { property: "og:title", content: "レジ | mnmrk" },
       {
         property: "og:description",
         content: "日替わりメニューをタップして合計金額を即計算。売上は時間帯まで記録されます。",
@@ -55,13 +55,14 @@ function RegisterPage() {
   const registerSaleFn = useServerFn(registerSale);
   const [isSaving, setIsSaving] = useState(false);
   const [customerView, setCustomerView] = useState(false);
-  const [search, setSearch] = useState("");
   const [discountOpen, setDiscountOpen] = useState(false);
   const [discountMode, setDiscountMode] = useState<"yen" | "percent">("yen");
   const [discountInput, setDiscountInput] = useState("");
   const [discount, setDiscount] = useState<{ type: "yen" | "percent"; value: number } | null>(null);
   const [changeOpen, setChangeOpen] = useState(false);
   const [received, setReceived] = useState("");
+  const [customerChangeOpen, setCustomerChangeOpen] = useState(false);
+  const [customerReceived, setCustomerReceived] = useState("");
   const settings = useSettings();
 
   const menusQuery = useQuery({
@@ -92,14 +93,10 @@ function RegisterPage() {
       );
   const total = Math.max(0, subtotal - discountAmount);
   const itemCount = lines.reduce((sum, l) => sum + l.quantity, 0);
-  const visibleMenus = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (!q) return menus;
-    return menus.filter((m) => m.name.toLowerCase().includes(q));
-  }, [menus, search]);
+  const visibleMenus = menus;
   const discountLabel = discount
     ? discount.type === "yen"
-      ? `${discount.value.toLocaleString()}円引き`
+      ? `${yen(discount.value)}引き`
       : `${discount.value}％引き`
     : null;
 
@@ -135,6 +132,8 @@ function RegisterPage() {
       setCart({});
       setDiscount(null);
       setReceived("");
+      setCustomerReceived("");
+      setCustomerChangeOpen(false);
       queryClient.invalidateQueries({ queryKey: ["sales", date] });
       queryClient.invalidateQueries({ queryKey: ["monthTotals"] });
       queryClient.invalidateQueries({ queryKey: ["analytics"] });
@@ -160,10 +159,20 @@ function RegisterPage() {
               <p className="text-xs text-muted-foreground">{settings.shopName}</p>
             </div>
           </div>
-          <Button variant="outline" size="sm" onClick={() => setCustomerView(false)}>
-            <X className="mr-1 h-4 w-4" />
-            スタッフ画面へ
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant={customerChangeOpen ? "default" : "outline"}
+              size="sm"
+              onClick={() => setCustomerChangeOpen((v) => !v)}
+            >
+              <Calculator className="mr-1 h-4 w-4" />
+              お釣り計算
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => setCustomerView(false)}>
+              <X className="mr-1 h-4 w-4" />
+              スタッフ画面へ
+            </Button>
+          </div>
         </div>
         <div className="flex flex-1 flex-col justify-between px-6 py-6">
           {lines.length === 0 ? (
@@ -197,16 +206,49 @@ function RegisterPage() {
               {yen(total)}
             </div>
           </div>
+          {customerChangeOpen && (
+            <div className="mt-4 rounded-lg border px-6 py-5">
+              <Label htmlFor="customer-received" className="text-base">
+                お預かり金額
+              </Label>
+              <Input
+                id="customer-received"
+                type="number"
+                min={0}
+                inputMode="numeric"
+                value={customerReceived}
+                onChange={(e) => setCustomerReceived(e.target.value)}
+                placeholder="1000"
+                className="mt-2 h-14 text-2xl"
+              />
+              {customerReceived !== "" && (
+                <div className="mt-4 space-y-1 text-right">
+                  <div className="text-lg text-muted-foreground">
+                    お預かり {yen(Number(customerReceived) || 0)}
+                  </div>
+                  <div className="text-base text-muted-foreground">お釣り</div>
+                  <div className="text-4xl font-bold tabular-nums text-primary">
+                    {(Number(customerReceived) || 0) - total < 0
+                      ? "—"
+                      : yen((Number(customerReceived) || 0) - total)}
+                  </div>
+                  {(Number(customerReceived) || 0) - total < 0 && (
+                    <p className="text-sm text-destructive">お預かり金額が不足しています</p>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background pb-32">
+    <div className="min-h-screen bg-background pb-48">
       <Toaster position="top-center" />
       <AppNav />
-      <main className="mx-auto max-w-5xl px-4 py-6">
+      <main className="mx-auto max-w-5xl px-4 py-6 pb-16">
         <header className="mb-4 flex flex-wrap items-end justify-between gap-3">
           <div>
             <h1 className="text-2xl font-bold tracking-tight">レジ</h1>
@@ -242,17 +284,6 @@ function RegisterPage() {
           </div>
         </header>
 
-        <div className="relative mb-4">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="商品を検索"
-            className="pl-9"
-            aria-label="商品検索"
-          />
-        </div>
-
         {menusQuery.isLoading ? (
           <p className="text-muted-foreground">読み込み中...</p>
         ) : menus.length === 0 ? (
@@ -264,8 +295,6 @@ function RegisterPage() {
               </Button>
             </CardContent>
           </Card>
-        ) : visibleMenus.length === 0 ? (
-          <p className="text-sm text-muted-foreground">「{search}」に一致する商品はありません。</p>
         ) : (
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {visibleMenus.map((menu) => {

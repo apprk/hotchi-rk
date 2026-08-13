@@ -31,12 +31,12 @@ function todayString() {
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "レジ | 総菜屋の売上台帳" },
+      { title: "レジ | mnmrk" },
       {
         name: "description",
         content: "日替わりメニューをタップするだけで合計金額を計算し、売上を記録できるお惣菜屋さん向けレジアプリ。",
       },
-      { property: "og:title", content: "レジ | 総菜屋の売上台帳" },
+      { property: "og:title", content: "レジ | mnmrk" },
       {
         property: "og:description",
         content: "日替わりメニューをタップして合計金額を即計算。売上は時間帯まで記録されます。",

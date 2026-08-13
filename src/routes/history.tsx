@@ -41,12 +41,12 @@ function pad(n: number) {
 export const Route = createFileRoute("/history")({
   head: () => ({
     meta: [
-      { title: "売上履歴カレンダー | 総菜屋の売上台帳" },
+      { title: "売上履歴カレンダー | mnmrk" },
       {
         name: "description",
         content: "カレンダーから日付を選んで、その日のお客さんごとの購入内容と金額を確認できます。",
       },
-      { property: "og:title", content: "売上履歴カレンダー | 総菜屋の売上台帳" },
+      { property: "og:title", content: "売上履歴カレンダー | mnmrk" },
       {
         property: "og:description",
         content: "日付ごと・お客さんごとの購入明細をさかのぼって確認できます。",

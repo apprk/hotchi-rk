@@ -29,12 +29,12 @@ function todayString() {
 export const Route = createFileRoute("/menu")({
   head: () => ({
     meta: [
-      { title: "日替わりメニュー設定 | 総菜屋の売上台帳" },
+      { title: "日替わりメニュー設定 | mnmrk" },
       {
         name: "description",
         content: "その日に販売するお惣菜の名前と値段を登録・編集できます。過去の日付からのコピーにも対応。",
       },
-      { property: "og:title", content: "日替わりメニュー設定 | 総菜屋の売上台帳" },
+      { property: "og:title", content: "日替わりメニュー設定 | mnmrk" },
       {
         property: "og:description",
         content: "その日に販売するお惣菜の名前と値段を登録・編集できます。",

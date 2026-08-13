@@ -34,12 +34,12 @@ import {
 export const Route = createFileRoute("/settings")({
   head: () => ({
     meta: [
-      { title: "設定 | ほっち 売上台帳" },
+      { title: "設定 | mnmrk" },
       {
         name: "description",
         content: "店舗名・電話番号・消費税率・レジのパスワード・CSV出力やバックアップを管理できます。",
       },
-      { property: "og:title", content: "設定 | ほっち 売上台帳" },
+      { property: "og:title", content: "設定 | mnmrk" },
       { property: "og:description", content: "税率やパスワード、データ出力の設定画面です。" },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },

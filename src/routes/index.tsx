@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useMemo, useState } from "react";
-import { Calculator, Minus, MonitorSmartphone, Percent, Plus, Search, Trash2, X } from "lucide-react";
+import { Calculator, Minus, MonitorSmartphone, Percent, Plus, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -55,13 +55,14 @@ function RegisterPage() {
   const registerSaleFn = useServerFn(registerSale);
   const [isSaving, setIsSaving] = useState(false);
   const [customerView, setCustomerView] = useState(false);
-  const [search, setSearch] = useState("");
   const [discountOpen, setDiscountOpen] = useState(false);
   const [discountMode, setDiscountMode] = useState<"yen" | "percent">("yen");
   const [discountInput, setDiscountInput] = useState("");
   const [discount, setDiscount] = useState<{ type: "yen" | "percent"; value: number } | null>(null);
   const [changeOpen, setChangeOpen] = useState(false);
   const [received, setReceived] = useState("");
+  const [customerChangeOpen, setCustomerChangeOpen] = useState(false);
+  const [customerReceived, setCustomerReceived] = useState("");
   const settings = useSettings();
 
   const menusQuery = useQuery({
@@ -92,11 +93,7 @@ function RegisterPage() {
       );
   const total = Math.max(0, subtotal - discountAmount);
   const itemCount = lines.reduce((sum, l) => sum + l.quantity, 0);
-  const visibleMenus = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (!q) return menus;
-    return menus.filter((m) => m.name.toLowerCase().includes(q));
-  }, [menus, search]);
+  const visibleMenus = menus;
   const discountLabel = discount
     ? discount.type === "yen"
       ? `${discount.value.toLocaleString()}円引き`
@@ -135,6 +132,8 @@ function RegisterPage() {
       setCart({});
       setDiscount(null);
       setReceived("");
+      setCustomerReceived("");
+      setCustomerChangeOpen(false);
       queryClient.invalidateQueries({ queryKey: ["sales", date] });
       queryClient.invalidateQueries({ queryKey: ["monthTotals"] });
       queryClient.invalidateQueries({ queryKey: ["analytics"] });

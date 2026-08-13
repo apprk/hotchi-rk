@@ -175,6 +175,10 @@ function MenuPage() {
   }
 
   const menus = menusQuery.data ?? [];
+  const query = name.trim().toLowerCase();
+  const suggestions = (pastQuery.data ?? [])
+    .filter((m) => (query ? m.name.toLowerCase().includes(query) : true))
+    .slice(0, 12);
   const displayMenus = order
     ? order.map((id) => menus.find((m) => m.id === id)).filter((m): m is (typeof menus)[number] => Boolean(m))
     : menus;

@@ -266,12 +266,33 @@ function SettingsContent() {
             <div className="flex items-center justify-between">
               <div>
                 <Label htmlFor="authEnabled">起動時のパスワード認証</Label>
-                <p className="text-xs text-muted-foreground">30日間は再入力不要です。</p>
+                <p className="text-xs text-muted-foreground">
+                  設定した日数のあいだ再入力が不要になります。
+                </p>
               </div>
               <Switch
                 id="authEnabled"
                 checked={form.authEnabled}
                 onCheckedChange={(checked) => save({ authEnabled: checked })}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="authDays">ログイン保持日数</Label>
+              <Input
+                id="authDays"
+                type="number"
+                min={1}
+                max={365}
+                value={form.authDays}
+                onChange={(e) => setForm({ ...form, authDays: Number(e.target.value) })}
+                onBlur={() =>
+                  save({
+                    authDays: Number.isFinite(form.authDays)
+                      ? Math.min(365, Math.max(1, Math.round(form.authDays)))
+                      : 30,
+                  })
+                }
+                className="w-32"
               />
             </div>
             <div className="flex flex-wrap items-end gap-3">
@@ -299,6 +320,17 @@ function SettingsContent() {
                 }}
               >
                 変更する
+              </Button>
+            </div>
+            <div className="border-t pt-4">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  signOut();
+                  window.location.href = "/";
+                }}
+              >
+                ログアウト
               </Button>
             </div>
           </CardContent>
